@@ -6,7 +6,7 @@ def clearAll():
     negativeField.delete(0,END)
     neutralField.delete(0,END)
     positiveField.delete(0, END)
-    overallField.deleete(0, END)
+    overallField.delete(0, END)
 
     # whole content of text area is deleted
     textArea.delete(1.0, END)
