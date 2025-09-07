@@ -105,13 +105,6 @@ python SentimentDetector_V2.py
 After installation:
 
 ```bash
-pip freeze > requirements_v1_freeze.txt
-pip freeze > requirements_v2_freeze.txt
-```
-
-Or a single pinned file:
-
-```bash
 pip freeze > requirements.txt
 ```
 
