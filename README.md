@@ -24,7 +24,7 @@ Portfolio for Course Project Artificial Intelligence (DLBDSEAIS02)
 
 ---
 
-## References (APA 7th Edition)
+## References & Bibliography
 
 Ashbaugh, L., & Zhang, Y. (2024). A comparative study of sentiment analysis on customer reviews using machine learning and deep learning. *Computers, 13*(12), 340. https://doi.org/10.3390/computers13120340  
 
