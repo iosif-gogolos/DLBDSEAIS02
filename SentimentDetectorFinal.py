@@ -136,27 +136,52 @@ class Analyzer:
     def _sarcasm_flag(self, text: str, probs: Dict[str, float]) -> bool:
         """
         Use textual entailment to detect contradiction between the review (premise)
-        and polarity statements (hypotheses). If the review strongly contradicts both
-        "This review is positive." and "This review is negative.", we avoid flagging.
-        If it contradicts the *dominant* sentiment hypothesis, it's a sarcasm cue.
-        (Sinha et al., 2023).  # APA: Sinha et al., 2023 :contentReference[oaicite:7]{index=7}
+        and polarity statements (hypotheses). If the review strongly contradicts the
+        *dominant* sentiment hypothesis, treat as a sarcasm cue (Sinha et al., 2023).
         """
         premise = text
         hyp_pos = "This review is positive."
         hyp_neg = "This review is negative."
 
+        def norm_nli_scores(res_item):
+            """
+            Normalize NLI scores into a dict with keys {ENTAILMENT, NEUTRAL, CONTRADICTION}.
+            Works for:
+              - [ {'label': 'ENTAILMENT','score':...}, ... ]  (list)
+              - {'label':'CONTRADICTION','score':...}          (single dict)
+            """
+            if isinstance(res_item, list):
+                pairs = [(d.get("label", "").upper(), float(d.get("score", 0.0))) for d in res_item]
+                return {k: v for k, v in pairs}
+            elif isinstance(res_item, dict):
+                # Single best label — create a one-hot-like mapping
+                lab = res_item.get("label", "").upper()
+                sc  = float(res_item.get("score", 0.0))
+                base = {"ENTAILMENT": 0.0, "NEUTRAL": 0.0, "CONTRADICTION": 0.0}
+                # Some checkpoints use LABEL_0/1/2. Heuristic remap if needed.
+                if lab.startswith("LABEL_"):
+                    # Common mapping used by roberta-large-mnli: LABEL_0=CONTRADICTION, LABEL_1=NEUTRAL, LABEL_2=ENTAILMENT
+                    mapping = {"LABEL_0": "CONTRADICTION", "LABEL_1": "NEUTRAL", "LABEL_2": "ENTAILMENT"}
+                    lab = mapping.get(lab, lab)
+                base[lab] = sc
+                return base
+            else:
+                # Unexpected — return zeros
+                return {"ENTAILMENT": 0.0, "NEUTRAL": 0.0, "CONTRADICTION": 0.0}
+
         def contradiction_prob(hypothesis: str) -> float:
-            res = self.nli({"text": premise, "text_pair": hypothesis})[0]
-            # Labels typically: ENTAILMENT, NEUTRAL, CONTRADICTION
-            scores = {d['label'].upper(): d['score'] for d in res}
+            out = self.nli({"text": premise, "text_pair": hypothesis})
+            # pipeline returns a list; take first item
+            first = out[0] if isinstance(out, list) else out
+            scores = norm_nli_scores(first)
             return float(scores.get("CONTRADICTION", 0.0))
 
         c_pos = contradiction_prob(hyp_pos)
         c_neg = contradiction_prob(hyp_neg)
 
-        dominant = "Positive" if probs["Positive"] >= probs["Negative"] else "Negative"
-        # Flag sarcasm when dominant stance is contradicted strongly.
+        dominant = "Positive" if probs.get("Positive", 0.0) >= probs.get("Negative", 0.0) else "Negative"
         return (dominant == "Positive" and c_pos > 0.6) or (dominant == "Negative" and c_neg > 0.6)
+
 
     # ---------- Clause / Aspect aggregation ----------
     def analyze(self, text: str) -> Dict[str, Any]:
@@ -231,7 +256,7 @@ class App:
 
         self.app = CTk.CTk()
         self.app.title("Sentiment Detector (Final)")
-        self.app.geometry("580x700")
+        self.app.geometry("580x800")
 
         self.enterText = CTk.CTkLabel(self.app, text="Enter Your Review")
         self.textArea = CTk.CTkTextbox(self.app, height=140, width=420, corner_radius=10, pady=10)
